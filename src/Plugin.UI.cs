@@ -21,6 +21,8 @@ namespace ToySerialController
         private UIDynamicButton PluginTitle, MotionSourceTitle, DebugTitle, RecordTitle;
         private JSONStorableStringChooser MotionSourceChooser;
         private JSONStorableString DeviceReportText;
+        private JSONStorableString L0ReportText;
+        private JSONStorableString ConfigCalcText;
         private JSONStorableBool DebugDrawEnableToggle;
         private UIHorizontalGroup PresetButtonGroup;
 
@@ -67,6 +69,16 @@ namespace ToySerialController
             DeviceReportText = debugGroup.CreateTextField("Device Report", "", 320);
             DeviceReportText.text.font = Font.CreateDynamicFontFromOSFont("Consolas", 24);
             DeviceReportText.text.fontSize = 24;
+
+            // display the min and max L0 values we've experienced.
+            L0ReportText = debugGroup.CreateTextField("L0 Report", "", 60);
+            L0ReportText.text.font = Font.CreateDynamicFontFromOSFont("Consolas", 24);
+            L0ReportText.text.fontSize = 24;
+
+            // display the recommended base offset and reference length given the L0 min and max values we've seen
+            ConfigCalcText = debugGroup.CreateTextField("Config Recommendation", "", 90);
+            ConfigCalcText.text.font = Font.CreateDynamicFontFromOSFont("Consolas", 24);
+            ConfigCalcText.text.fontSize = 24;
 
             debugGroup.SetVisible(false);
 

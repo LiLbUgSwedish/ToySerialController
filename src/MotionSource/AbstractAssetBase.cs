@@ -22,6 +22,7 @@ namespace ToySerialController.MotionSource
         protected Vector3 Extents { get; private set; }
 
         public Vector3 Position { get; private set; }
+        public Vector3 RawPosition { get; private set; }
         public Vector3 Up { get; private set; }
         public Vector3 Right { get; private set; }
         public Vector3 Forward { get; private set; }

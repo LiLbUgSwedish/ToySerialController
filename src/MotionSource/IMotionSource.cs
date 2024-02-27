@@ -7,6 +7,7 @@ namespace ToySerialController.MotionSource
     public interface IMotionSource : IUIProvider, IConfigProvider
     {
         Vector3 ReferencePosition { get; }
+        Vector3 ReferencePositionRaw { get; }
         Vector3 ReferenceUp { get; }
         Vector3 ReferenceRight { get; }
         Vector3 ReferenceForward { get; }
@@ -22,6 +23,11 @@ namespace ToySerialController.MotionSource
         bool Update();
         void OnSceneChanging();
         void OnSceneChanged();
+
+        float GetRealReferenceLength();
+
+        void SetBaseOffset(float offset);
+        float GetBaseOffset();
 
     }
 }

@@ -49,5 +49,20 @@ namespace ToySerialController.MotionSource
 
             return true;
         }
+
+        public float GetRealLength()
+        {
+            return Length;
+        }
+
+        public void SetBaseOffset(float offset)
+        {
+            // do nothing.
+        }
+
+        public float GetBaseOffset()
+        {
+            return 0;
+        }
     }
 }

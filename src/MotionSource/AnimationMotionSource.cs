@@ -23,10 +23,12 @@ namespace ToySerialController.MotionSource
         private SuperController Controller => SuperController.singleton;
 
         public override Vector3 ReferencePosition => _animatedObject.position;
+        public override Vector3 ReferencePositionRaw => _animatedObject.position;
         public override Vector3 ReferenceUp => _animatedObject.up;
         public override Vector3 ReferenceRight => _animatedObject.right;
         public override Vector3 ReferenceForward => _animatedObject.forward;
         public override float ReferenceLength => _referenceLength;
+        public override float RealReferenceLength => GetRealReferenceLength();
         public override float ReferenceRadius => _referenceRadius;
         public override Vector3 ReferencePlaneNormal => _targetUp;
 
@@ -125,5 +127,21 @@ namespace ToySerialController.MotionSource
         }
 
         protected override void RefreshButtonCallback() => FindAnimations(AnimationChooser.val);
+
+        public override float GetReferenceLength()
+        {
+            // return a real reference length for the motion source, which may be different for dildos and males
+            return _referenceLength;
+        }
+
+        protected override void _SetBaseOffset(float offset)
+        {
+            // do nothing
+        }
+
+        protected override float _GetBaseOffset()
+        {
+            return 0;
+        }
     }
 }

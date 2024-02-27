@@ -16,6 +16,7 @@ namespace ToySerialController.MotionSource
         private SuperController Controller => SuperController.singleton;
 
         public Vector3 Position { get;private set; }
+        public Vector3 RawPosition { get; private set; } // position with no base offset applied
         public Vector3 Up { get; private set; }
         public Vector3 Right { get; private set; }
         public Vector3 Forward { get; private set; }
@@ -26,7 +27,7 @@ namespace ToySerialController.MotionSource
         public void CreateUI(IUIBuilder builder)
         {
             MaleChooser = builder.CreatePopup("MotionSource:Male", "Select Male", null, null, MaleChooserCallback);
-            PenisBaseOffset = builder.CreateSlider("MotionSource:PenisBaseOffset", "Penis base offset", 0, -0.05f, 0.05f, true, true);
+            PenisBaseOffset = builder.CreateSlider("MotionSource:PenisBaseOffset", "Penis base offset", 0, -0.5f, 0.5f, true, true);
 
             FindMales();
         }
@@ -65,7 +66,7 @@ namespace ToySerialController.MotionSource
                 return false;
 
             var gen1Transform = gen1Collider.transform;
-            var gen1Position = gen1Transform.position - gen1Transform.up * (gen1Collider.height / 2 - gen1Collider.radius - PenisBaseOffset.val);
+            var gen1Position = gen1Transform.position - gen1Transform.up * (gen1Collider.height / 2 - gen1Collider.radius + PenisBaseOffset.val);
             var gen2Position = gen2Collider.transform.position;
             var gen3aPosition = gen3aCollider.transform.position;
             var gen3bPosition = gen3bCollider.transform.position + gen3bCollider.transform.right * gen3bCollider.radius;
@@ -74,8 +75,11 @@ namespace ToySerialController.MotionSource
             Right = -gen1Transform.forward;
             Forward = gen1Transform.right;
             Position = gen1Position;
+            RawPosition = gen1Transform.position - gen1Transform.up * (gen1Collider.height / 2 - gen1Collider.radius);
             Radius = gen2Collider.radius;
             Length = Vector3.Distance(gen1Position, gen2Position) + Vector3.Distance(gen2Position, gen3aPosition) + Vector3.Distance(gen3aPosition, gen3bPosition);
+            // TODO:: is a better length calculation ((gen1.position - (gen1.up * height / 2)) - gen3b.position) + gen3b.radius/2 ?
+            //          This should give the length of the shaft? adding the distance between the segments assumes they do not overlap AND and perfectly touching at their edges?
 
             var pelvisRight = _maleAtom.GetComponentByName<Collider>("AutoColliderpelvisFR3Joint")?.transform;
             var pelvidLeft = _maleAtom.GetComponentByName<Collider>("AutoColliderpelvisFL3Joint")?.transform;
@@ -113,5 +117,35 @@ namespace ToySerialController.MotionSource
         }
 
         public void Refresh() => FindMales(MaleChooser.val);
+
+        // get the most accurate length we can for the penis, with no modifiers applied (eg penis base offset is ignored)
+        public float GetRealLength()
+        {
+            var gen1Collider = _maleAtom.GetComponentByName<CapsuleCollider>("AutoColliderGen1Hard");
+            var gen2Collider = _maleAtom.GetComponentByName<CapsuleCollider>("AutoColliderGen2Hard");
+            var gen3aCollider = _maleAtom.GetComponentByName<CapsuleCollider>("AutoColliderGen3aHard");
+            var gen3bCollider = _maleAtom.GetComponentByName<CapsuleCollider>("AutoColliderGen3bHard");
+
+            if (gen1Collider == null || gen2Collider == null || gen3aCollider == null || gen3bCollider == null)
+                return 0.1f;
+
+            var gen1Transform = gen1Collider.transform;
+            var gen1Position = gen1Transform.position - gen1Transform.up * (gen1Collider.height / 2 - gen1Collider.radius);
+            var gen2Position = gen2Collider.transform.position;
+            var gen3aPosition = gen3aCollider.transform.position;
+            var gen3bPosition = gen3bCollider.transform.position + gen3bCollider.transform.right * gen3bCollider.radius;
+
+            return Vector3.Distance(gen1Position, gen2Position) + Vector3.Distance(gen2Position, gen3aPosition) + Vector3.Distance(gen3aPosition, gen3bPosition);
+        }
+
+        public void SetBaseOffset(float offset)
+        {
+            PenisBaseOffset.val = offset;
+        }
+
+        public float GetBaseOffset()
+        {
+            return PenisBaseOffset.val;
+        }
     }
 }

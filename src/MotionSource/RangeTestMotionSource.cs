@@ -9,6 +9,7 @@ namespace ToySerialController.MotionSource
     public class RangeTestMotionSource : IMotionSource
     {
         public Vector3 ReferencePosition { get; private set; }
+        public Vector3 ReferencePositionRaw { get; private set; }
         public Vector3 ReferenceUp { get; private set; }
         public Vector3 ReferenceRight { get; private set; }
         public Vector3 ReferenceForward { get; private set; }
@@ -113,5 +114,20 @@ namespace ToySerialController.MotionSource
 
         public virtual void OnSceneChanging() { }
         public virtual void OnSceneChanged() { }
+
+        public float GetRealReferenceLength()
+        {
+            return ReferenceLength;
+        }
+
+        public void SetBaseOffset(float offset)
+        {
+            // do nothing.
+        }
+
+        public float GetBaseOffset()
+        {
+            return 0;
+        }
     }
 }

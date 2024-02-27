@@ -13,10 +13,12 @@ namespace ToySerialController.MotionSource
         private JSONStorableAction RefreshAction;
 
         public abstract Vector3 ReferencePosition { get; }
+        public abstract Vector3 ReferencePositionRaw { get; }
         public abstract Vector3 ReferenceUp { get; }
         public abstract Vector3 ReferenceRight { get; }
         public abstract Vector3 ReferenceForward { get; }
         public abstract float ReferenceLength { get; }
+        public abstract float RealReferenceLength { get; }
         public abstract float ReferenceRadius { get; }
         public abstract Vector3 ReferencePlaneNormal { get; }
         public abstract Vector3 TargetPosition { get; }
@@ -27,6 +29,9 @@ namespace ToySerialController.MotionSource
         public abstract bool Update();
         public abstract void StoreConfig(JSONNode config);
         public abstract void RestoreConfig(JSONNode config);
+        public abstract float GetReferenceLength();
+        protected abstract void _SetBaseOffset(float offset);
+        protected abstract float _GetBaseOffset();
 
         public virtual void CreateUI(IUIBuilder builder)
         {
@@ -61,6 +66,23 @@ namespace ToySerialController.MotionSource
         public virtual void OnSceneChanged()
         {
             RefreshButtonCallback();
+        }
+
+        public float GetRealReferenceLength()
+        {
+            return GetReferenceLength();
+        }
+
+        public void SetBaseOffset(float offset)
+        {
+            // call abstract function
+            _SetBaseOffset(offset);
+        }
+
+        public float GetBaseOffset()
+        {
+            // call abstract function
+            return _GetBaseOffset();
         }
     }
 }

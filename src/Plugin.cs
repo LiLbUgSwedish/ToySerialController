@@ -107,6 +107,8 @@ namespace ToySerialController
                 if (DebugDrawEnableToggle.val)
                 {
                     DeviceReportText.val = _device?.GetDeviceReport() ?? string.Empty;
+                    L0ReportText.val = _device?.GetL0Report() ?? string.Empty;
+                    ConfigCalcText.val = _device?.GetConfigCalc() ?? string.Empty;
                 }
             }
             catch (Exception e)

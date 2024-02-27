@@ -15,6 +15,9 @@ namespace ToySerialController
     public partial class TCodeDevice : IDevice
     {
         private UIDynamicButton MainTitle;
+        private UIDynamicButton btnResetCounters;
+        private JSONStorableBool AutoLengthToggle;
+        private JSONStorableFloat AutoLengthReactSpeed;
         private JSONStorableFloat SmoothingSlider;
         private JSONStorableFloat ReferenceLengthScaleSlider;
         private JSONStorableFloat ReferenceRadiusScaleSlider;
@@ -106,6 +109,10 @@ namespace ToySerialController
             var group = new UIGroup(_group);
 
             MainTitle = _group.CreateButton("Main", () => group.SetVisible(visible = !visible), new Color(0.3f, 0.3f, 0.3f), Color.white, true);
+
+            btnResetCounters = builder.CreateButton("Reset Counters", () => ResetCounters(), Color.red * 0.8f, Color.white, true);
+            AutoLengthToggle = builder.CreateToggle("Device:Main:AutoLength", "Auto Length", false, true);
+            AutoLengthReactSpeed = builder.CreateSlider("Device:Main:AutoLengthReactSpeed", "React Speed (s)", 3.0f, 1, 10, true, true, true, "F0");
 
             SmoothingSlider = group.CreateSlider("Plugin:Smoothing", "Smoothing (%)", 0.1f, 0.0f, 0.99f, true, true, true, "P0");
             ReferenceLengthScaleSlider = group.CreateSlider("Device:ReferenceLengthScale", "Reference Length (%)", 1.0f, 0, 3, true, true, true, "P0");

@@ -13,10 +13,12 @@ namespace ToySerialController.MotionSource
         protected IMotionSourceTarget Target { get; }
 
         public override Vector3 ReferencePosition => Reference.Position;
+        public override Vector3 ReferencePositionRaw => Reference.RawPosition;
         public override Vector3 ReferenceUp => Reference.Up;
         public override Vector3 ReferenceRight => Reference.Right;
         public override Vector3 ReferenceForward => Reference.Forward;
         public override float ReferenceLength => Reference.Length;
+        public override float RealReferenceLength => GetRealReferenceLength();
         public override float ReferenceRadius => Reference.Radius;
         public override Vector3 ReferencePlaneNormal => Reference.PlaneNormal;
         public override Vector3 TargetPosition => Target.Position;
@@ -86,6 +88,23 @@ namespace ToySerialController.MotionSource
         {
             Reference.Refresh();
             Target.Refresh();
+        }
+
+        public override float GetReferenceLength()
+        {
+            // return a real reference length for the motion source, which may be different for dildos and males
+            return Reference.GetRealLength();
+        }
+
+        protected override void _SetBaseOffset(float offset)
+        {
+            // set base offset on the motion source
+            Reference.SetBaseOffset(offset);
+        }
+
+        protected override float _GetBaseOffset()
+        {
+            return Reference.GetBaseOffset();
         }
     }
 }

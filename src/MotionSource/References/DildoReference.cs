@@ -16,6 +16,7 @@ namespace ToySerialController.MotionSource
         private SuperController Controller => SuperController.singleton;
 
         public Vector3 Position { get; private set; }
+        public Vector3 RawPosition { get; private set; }
         public Vector3 Up { get; private set; }
         public Vector3 Right { get; private set; }
         public Vector3 Forward { get; private set; }
@@ -102,5 +103,34 @@ namespace ToySerialController.MotionSource
         }
 
         public void Refresh() => FindDildos(DildoChooser.val);
+
+        public float GetRealLength()
+        {
+            if (_dildoAtom == null || !_dildoAtom.on)
+                return 0.1f;
+
+            var baseCollider = _dildoAtom.GetComponentByName<Transform>("b1").GetComponentByName<CapsuleCollider>("_Collider1");
+            var midCollider = _dildoAtom.GetComponentByName<Transform>("b2").GetComponentByName<CapsuleCollider>("_Collider2");
+            var tipCollider = _dildoAtom.GetComponentByName<Transform>("b3").GetComponentByName<CapsuleCollider>("_Collider2");
+
+            if (baseCollider == null || midCollider == null || tipCollider == null)
+                return 0.1f;
+
+            var basePosition = baseCollider.transform.position - baseCollider.transform.up * (baseCollider.radius / 2);
+            var midPosition = midCollider.transform.position;
+            var tipPosition = tipCollider.transform.position + tipCollider.transform.up * tipCollider.height;
+
+            return Vector3.Distance(basePosition, midPosition) + Vector3.Distance(midPosition, tipPosition);
+        }
+
+        public void SetBaseOffset(float offset)
+        {
+            DildoBaseOffset.val = offset;
+        }
+
+        public float GetBaseOffset()
+        {
+            return DildoBaseOffset.val;
+        }
     }
 }

@@ -6,12 +6,14 @@ using ToySerialController.Device.OutputTarget;
 using UnityEngine;
 using ToySerialController.Utils;
 using ToySerialController.UI;
+using System.Collections.Generic;
+using System;
 
 namespace ToySerialController
 {
     public partial class TCodeDevice : IDevice
     {
-        protected readonly float[] XTarget, RTarget, ETarget;
+        protected readonly float[] XTarget, XTargetRaw, RTarget, ETarget;
         protected readonly float[] XCmd, RCmd, ECmd;
         protected readonly float[] LastXCmd, LastRCmd, LastECmd;
         protected readonly JSONStorableFloat[] XParam, RParam, EParam;
@@ -24,6 +26,17 @@ namespace ToySerialController
         private float _lastCollisionSmoothingT;
         private float _lastNoCollisionSmoothingStartTime, _lastNoCollisionSmoothingDuration;
         private bool _isLoading;
+
+        // TODO:: remember the maximum and minimum L0 values
+        // we can try to use this, along with reference length and base offset maybe, to try to auto-configure.
+        private float _minL0 = 1.0f;
+        private float _maxL0 = 0.0f;
+
+        // keep a list of L0 values we can use to check min and max values for; truncate after a certain amount of time.
+        private Dictionary<DateTime, float> _l0Values = new Dictionary<DateTime, float>();
+
+        // remember the male penis length, used to calculate base offset?
+        private float _length = 0;
 
         public string GetDeviceReport()
         {
@@ -43,10 +56,50 @@ namespace ToySerialController
                 .Append("A2\t").AppendFormat(format, ETarget[3]).AppendFormat(format, ECmd[3]).AppendTCode("A2", ECmd[3])
                 .ToString();
         }
+        public string GetL0Report()
+        {
+            return "Max L0: " + _maxL0 + "\r\nMin L0: " + _minL0;
+        }
+
+        public string GetConfigCalc()
+        {
+            // determine recommended length
+            var length = GetRecommendedLength();
+            // determine recommended base offset
+            var offset = GetRecommendedOffset();
+            return "Recommended Settings: \r\n  Base Offset: " + offset + "\r\nReference Length: " + length;
+        }
+
+        // get the recommended length based on the readings we have
+        private float GetRecommendedLength()
+        {
+            // calculate the recommended length based on how much of the actual penis length is utilized
+            float recommend = ((_maxL0 - _minL0) * 1.1f);
+            // now compensate for the fact that the base offset (once applied) will effectively shorten the penis so we need to buff the length in return
+            float offsetAsPercLength = GetRecommendedOffset() / _length * -1; // the percentage of the length we used up on the base offset
+            // NOTE:: we * by negative 1 since a negative base offset will DECREASE the available length
+            // increase the length by the ratio? of the full length to the length left over after changing the base
+            recommend = recommend / (1 - offsetAsPercLength);
+            return recommend;
+        }
+
+        // get the recommended offset based on the readings we have
+        private float GetRecommendedOffset()
+        {
+            return (1 - _maxL0 - 0.05f) * _length * -1;
+        }
+
+        public void ResetCounters()
+        {
+            _maxL0 = 0.0f;
+            _minL0 = 1.0f;
+            _l0Values.Clear();
+        }
 
         public TCodeDevice()
         {
             XTarget = new float[3];
+            XTargetRaw = new float[1];
             RTarget = new float[3];
             ETarget = new float[4];
 
@@ -93,6 +146,9 @@ namespace ToySerialController
             else if (motionSource != null)
             {
                 UpdateMotion(motionSource);
+                // update the tracking values we use for auto-adjusting the penis base and reference length
+                UpdateAutoConfig(motionSource);
+                UpdateConfig(motionSource);
 
                 DebugDraw.DrawCircle(motionSource.TargetPosition + motionSource.TargetUp * RangeMinL0Slider.val * motionSource.ReferenceLength, motionSource.TargetUp, motionSource.TargetRight, Color.white, 0.05f);
                 DebugDraw.DrawCircle(motionSource.TargetPosition + motionSource.TargetUp * RangeMaxL0Slider.val * motionSource.ReferenceLength, motionSource.TargetUp, motionSource.TargetRight, Color.white, 0.05f);
@@ -329,6 +385,113 @@ namespace ToySerialController
 
                 return false;
             }
+        }
+
+        private bool UpdateAutoConfig(IMotionSource motionSource)
+        {
+            if (AutoLengthToggle.val)
+            {
+                var length = motionSource.GetRealReferenceLength();
+                _length = motionSource.GetRealReferenceLength();
+                var radius = motionSource.ReferenceRadius;
+                // get the raw reference position (ignoring penis base offset or other settings)
+                var position = motionSource.ReferencePositionRaw;
+                var referenceEnding = position + motionSource.ReferenceUp * length;
+                var diffPosition = motionSource.TargetPosition - position;
+                var diffEnding = motionSource.TargetPosition - referenceEnding;
+                var aboveTarget = (Vector3.Dot(diffPosition, motionSource.TargetUp) < 0 && Vector3.Dot(diffEnding, motionSource.TargetUp) < 0)
+                                    || Vector3.Dot(diffPosition, motionSource.ReferenceUp) < 0;
+                var t = Mathf.Clamp(Vector3.Dot(motionSource.TargetPosition - position, motionSource.ReferenceUp), 0f, length);
+                var closestPoint = position + motionSource.ReferenceUp * t;
+                if (Vector3.Magnitude(closestPoint - motionSource.TargetPosition) <= radius)
+                {
+                    if (diffPosition.magnitude > 0.0001f)
+                    {
+                        XTargetRaw[0] = 1 - Mathf.Clamp01((closestPoint - position).magnitude / length);
+                        if (aboveTarget)
+                            XTargetRaw[0] = XTargetRaw[0] > 0 ? 1 : 0;
+                    }
+                    else
+                    {
+                        XTargetRaw[0] = 1;
+                    }
+                    // update min and max
+                    //_minL0 = _minL0 < XTarget[0] ? _minL0 : XTarget[0];
+                    //_maxL0 = _maxL0 > XTarget[0] ? _maxL0 : XTarget[0];
+                    //SuperController.LogMessage($"history: {_l0Values.Count}");
+                    _l0Values[DateTime.Now] = XTargetRaw[0];
+                    // remove any old timestamps
+                    for (int i = 0; i < _l0Values.Count; i++)
+                    {
+                        var item = _l0Values.ElementAt(i);
+                        if (DateTime.Now.Subtract(item.Key).TotalSeconds > AutoLengthReactSpeed.val)
+                        {
+                            _l0Values.Remove(item.Key);
+                            i--;
+                        }
+                    }
+                    // determine min and max from history
+                    _minL0 = _l0Values.Min(x => x.Value);
+                    _maxL0 = _l0Values.Max(x => x.Value);
+
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        private bool UpdateConfig(IMotionSource motionSource)
+        {
+            // update the length
+            if (AutoLengthToggle.val)
+            {
+                // determine proposed length
+                var length = GetRecommendedLength();
+                // determine length error
+                var lengthDelta = length - ReferenceLengthScaleSlider.val;
+                //SuperController.LogMessage($"length: {length} lengthD: {lengthDelta} XTarget: {XTarget[0]} Reference: {ReferenceLengthScaleSlider.val}");
+
+                // if the current length is deemed too short, lengthen, but only if current target is below 5% (penis is JUST inside vagina, about to pop out? so we can lengthen to avoid or re-insert?)
+                if (lengthDelta > 0 && XTarget[0] < 0.05)
+                {
+                    // NOTE:: We do not allow lengthening when ?? not sure but it works, keep an eye on it
+                    ReferenceLengthScaleSlider.val += 0.01f;
+                    //SuperController.LogMessage("Lengthen");
+                }
+
+                // if the current length is deemed too long, shorten, but only if current target is above 5% (penis is inside vagina, if < 5% then penis is outside vagina)
+                if (lengthDelta < 0 && XTarget[0] > 0.05 && ReferenceLengthScaleSlider.val > 0.1)
+                {
+                    // NOTE:: We do not allow shortening when ?? not sure but it works, keep an eye on it
+                    ReferenceLengthScaleSlider.val -= 0.01f;
+                    //SuperController.LogMessage("Shorten");
+                }
+
+                // determine proposed base offset
+                var offset = GetRecommendedOffset();
+                // round to be less precise
+                offset = Mathf.Round(offset * 1000f) / 1000f;
+                //SuperController.LogMessage($"offset: {offset} BaseOffset: {motionSource.PenisBaseOffset}");
+
+                // if current base is deemed too shallow, extend, but only if ??
+                if (offset < motionSource.GetBaseOffset() && XTarget[0] < 0.95)
+                {
+                    //motionSource.PenisBaseOffset -= 0.001f;
+                    motionSource.SetBaseOffset(motionSource.GetBaseOffset() - 0.001f);
+                }
+                // if current base is deemed too deep, retract, but only if ??
+                if (offset > motionSource.GetBaseOffset() && XTarget[0] > 0.95)
+                {
+                    //motionSource.PenisBaseOffset += 0.001f;
+                    motionSource.SetBaseOffset(motionSource.GetBaseOffset() + 0.001f);
+                }
+                return true;
+            }
+            return false;
         }
 
         public void Dispose() => Dispose(true);

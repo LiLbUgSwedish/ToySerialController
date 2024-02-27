@@ -11,6 +11,8 @@ namespace ToySerialController
         bool Update(IMotionSource motionSource, IOutputTarget outputTarget, IDeviceRecorder recorder);
 
         string GetDeviceReport();
+        string GetL0Report();
+        string GetConfigCalc();
         void OnSceneChanging();
         void OnSceneChanged();
     }
