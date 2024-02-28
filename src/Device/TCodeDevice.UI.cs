@@ -15,12 +15,16 @@ namespace ToySerialController
     public partial class TCodeDevice : IDevice
     {
         private UIDynamicButton MainTitle;
-        private UIDynamicButton btnResetCounters;
-        private JSONStorableBool AutoLengthToggle;
-        private JSONStorableFloat AutoLengthReactSpeed;
         private JSONStorableFloat SmoothingSlider;
         private JSONStorableFloat ReferenceLengthScaleSlider;
         private JSONStorableFloat ReferenceRadiusScaleSlider;
+
+        private UIDynamicButton AutoConfigTitle;
+        private UIDynamicButton btnResetCounters;
+        private JSONStorableBool AutoConfigToggle;
+        private JSONStorableStringChooser AutoStyleChooser;
+        private JSONStorableFloat AutoConfigBufferLength;
+        private JSONStorableFloat AutoConfigBuffer;
 
         private UIDynamicButton L0AxisTitle;
         private JSONStorableBool InvertL0Toggle;
@@ -105,21 +109,8 @@ namespace ToySerialController
         {
             _group = new UIGroup(builder);
 
-            var visible = false;
-            var group = new UIGroup(_group);
-
-            MainTitle = _group.CreateButton("Main", () => group.SetVisible(visible = !visible), new Color(0.3f, 0.3f, 0.3f), Color.white, true);
-
-            btnResetCounters = builder.CreateButton("Reset Counters", () => ResetCounters(), Color.red * 0.8f, Color.white, true);
-            AutoLengthToggle = builder.CreateToggle("Device:Main:AutoLength", "Auto Length", false, true);
-            AutoLengthReactSpeed = builder.CreateSlider("Device:Main:AutoLengthReactSpeed", "React Speed (s)", 3.0f, 1, 10, true, true, true, "F0");
-
-            SmoothingSlider = group.CreateSlider("Plugin:Smoothing", "Smoothing (%)", 0.1f, 0.0f, 0.99f, true, true, true, "P0");
-            ReferenceLengthScaleSlider = group.CreateSlider("Device:ReferenceLengthScale", "Reference Length (%)", 1.0f, 0, 3, true, true, true, "P0");
-            ReferenceRadiusScaleSlider = group.CreateSlider("Device:ReferenceRadiusScale", "Reference Radius (%)", 3.0f, 0, 5, true, true, true, "P0");
-
-            group.SetVisible(false);
-
+            CreateMainUI(_group);
+            CreateAutoConfigUI(_group);
             CreateL0AxisUI(_group);
             CreateL1AxisUI(_group);
             CreateL2AxisUI(_group);
@@ -151,6 +142,43 @@ namespace ToySerialController
             OutputA0CurveEditorSettings?.RestoreConfig(config);
             OutputA1CurveEditorSettings?.RestoreConfig(config);
             OutputA2CurveEditorSettings?.RestoreConfig(config);
+        }
+
+        private void CreateMainUI(IUIBuilder builder)
+        {
+            var visible = false;
+            var group = new UIGroup(_group);
+
+            MainTitle = _group.CreateButton("Main", () => group.SetVisible(visible = !visible), new Color(0.3f, 0.3f, 0.3f), Color.white, true);
+            SmoothingSlider = group.CreateSlider("Plugin:Smoothing", "Smoothing (%)", 0.1f, 0.0f, 0.99f, true, true, true, "P0");
+            ReferenceLengthScaleSlider = group.CreateSlider("Device:ReferenceLengthScale", "Reference Length (%)", 1.0f, 0, 3, true, true, true, "P0");
+            ReferenceRadiusScaleSlider = group.CreateSlider("Device:ReferenceRadiusScale", "Reference Radius (%)", 3.0f, 0, 5, true, true, true, "P0");
+
+            group.SetVisible(false);
+        }
+
+        private void CreateAutoConfigUI(IUIBuilder builder)
+        {
+            var visible = false;
+            var group = new UIGroup(_group);
+
+            AutoConfigTitle = _group.CreateButton("Auto Config", () => group.SetVisible(visible = !visible), new Color(0.3f, 0.3f, 0.3f), Color.white, true);
+            btnResetCounters = group.CreateButton("Reset Counters", () => ResetCounters(), new Color(0.7f, 0.7f, 0.7f), Color.white, true);
+            // choose auto style (min max total, average over time, other?)
+            var autoStyles = new List<string>
+            {
+                "Min + Max", "Average over time"
+            };
+            AutoStyleChooser = group.CreatePopup("Plugin:AutoStyleChooser", "Select auto config mode", autoStyles, "Average over time", AutoStyleChooserCallback, true);
+            AutoConfigToggle = group.CreateToggle("Device:Main:Auto Config", "Auto Config", false, true);
+            AutoConfigBufferLength = group.CreateSlider("Device:Main:AutoConfigBufferLength", "Buffer Length (s)", 3.0f, 1, 10, true, true, true, "F0");
+            AutoConfigBuffer = group.CreateSlider("Device:Main:AutoConfigBuffer", "Recommended Length Inflation (%)", 0.1f, -1, 1, true, true, true, "P0");
+
+            // TODO:: we can have some custom UI elements based on which style we choose, so simple min/max shown for that style or something more comprehensive for the over-time choice.
+
+            AutoStyleChooserCallback("Average over time");
+
+            group.SetVisible(false);
         }
 
         private void CreateL0AxisUI(IUIBuilder builder)
@@ -330,6 +358,11 @@ namespace ToySerialController
             OverrideA2Slider = group.CreateSlider("Device:A2:Override", "Override Value (%)", 0f, 0f, 1f, true, true, true, "P0");
 
             group.SetVisible(false);
+        }
+
+        protected void AutoStyleChooserCallback(string s)
+        {
+            // nothing yet
         }
     }
 

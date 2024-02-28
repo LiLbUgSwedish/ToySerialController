@@ -27,7 +27,7 @@ namespace ToySerialController.MotionSource
         public void CreateUI(IUIBuilder builder)
         {
             MaleChooser = builder.CreatePopup("MotionSource:Male", "Select Male", null, null, MaleChooserCallback);
-            PenisBaseOffset = builder.CreateSlider("MotionSource:PenisBaseOffset", "Penis base offset", 0, -0.5f, 0.5f, true, true);
+            PenisBaseOffset = builder.CreateSlider("MotionSource:PenisBaseOffset", "Penis base offset", 0, -0.5f, 0.5f, true, true, false, "F3");
 
             FindMales();
         }

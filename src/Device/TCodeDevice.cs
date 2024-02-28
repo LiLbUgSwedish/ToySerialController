@@ -31,6 +31,8 @@ namespace ToySerialController
         // we can try to use this, along with reference length and base offset maybe, to try to auto-configure.
         private float _minL0 = 1.0f;
         private float _maxL0 = 0.0f;
+        // remember if we are not in contact with penis, then we can return placeholder values.
+        private bool _aboveTarget = false;
 
         // keep a list of L0 values we can use to check min and max values for; truncate after a certain amount of time.
         private Dictionary<DateTime, float> _l0Values = new Dictionary<DateTime, float>();
@@ -64,29 +66,62 @@ namespace ToySerialController
         public string GetConfigCalc()
         {
             // determine recommended length
-            var length = GetRecommendedLength();
+            var length = InflateLength();
             // determine recommended base offset
-            var offset = GetRecommendedOffset();
+            var offset = InflateOffset();
             return "Recommended Settings: \r\n  Base Offset: " + offset + "\r\nReference Length: " + length;
         }
 
         // get the recommended length based on the readings we have
         private float GetRecommendedLength()
         {
+            // if we are above target, recommended length is always 100% (so we get good feedback when inserting penis)
+            if (_aboveTarget)
+            {
+                return 1;
+            }
+
             // calculate the recommended length based on how much of the actual penis length is utilized
-            float recommend = ((_maxL0 - _minL0) * 1.1f);
+            float recommend = (_maxL0 - _minL0);
             // now compensate for the fact that the base offset (once applied) will effectively shorten the penis so we need to buff the length in return
-            float offsetAsPercLength = GetRecommendedOffset() / _length * -1; // the percentage of the length we used up on the base offset
             // NOTE:: we * by negative 1 since a negative base offset will DECREASE the available length
-            // increase the length by the ratio? of the full length to the length left over after changing the base
+            float offsetAsPercLength = GetRecommendedOffset() / _length * -1; // the percentage of the length we used up on the base offset
+            
+            // increase the length by the (ratio?) of the full length to the length left over after changing the base
             recommend = recommend / (1 - offsetAsPercLength);
+
+            // NOTE:: the recommended length is a PERCENTAGE. We set this directly onto the ReferenceLength slider, which is the percentage of the actual length to use.
             return recommend;
         }
 
         // get the recommended offset based on the readings we have
         private float GetRecommendedOffset()
         {
-            return (1 - _maxL0 - 0.05f) * _length * -1;
+            // if we are above target, recommended offset is always 0 (so we have a good range of motion for penis insertion)
+            if (_aboveTarget)
+            {
+                return 0;
+            }
+
+            // determine the desired offset (this is in UNITS not percent, so multiple by the length to get the actual offset)
+            // we do 1 - maxL0 to get the percentage of the available length that is BELOW the deepest point reached (remember L0 axis is inverted)
+            return ((1 - _maxL0) * _length) * -1;
+        }
+
+        private float InflateLength()
+        {
+            // inflate the length by the configured amount
+            float inflate = AutoConfigBuffer.val + 1;
+            return GetRecommendedLength() * inflate;
+        }
+
+        private float InflateOffset()
+        {
+            // reduce or increase the base offset by half the amount we changed the length by
+            // NOTE we need to convert the length to units rather than percentage
+            float inflate = (AutoConfigBuffer.val / 2) * (GetRecommendedLength() * _length);
+            // add this to the offset (if offset is negative and inflation is positive, the base offset will move TOWARD the pelvis, which is what we want).
+            return GetRecommendedOffset() + inflate;
         }
 
         public void ResetCounters()
@@ -333,14 +368,14 @@ namespace ToySerialController
             for (var i = 0; i < 5; i++)
                 DebugDraw.DrawCircle(Vector3.Lerp(motionSource.ReferencePosition, referenceEnding, i / 4.0f), motionSource.ReferenceUp, motionSource.ReferenceRight, Color.grey, radius);
 
-            var t = Mathf.Clamp(Vector3.Dot(motionSource.TargetPosition - motionSource.ReferencePosition, motionSource.ReferenceUp), 0f, length);
+            var t = Vector3.Dot(motionSource.TargetPosition - motionSource.ReferencePosition, motionSource.ReferenceUp);
             var closestPoint = motionSource.ReferencePosition + motionSource.ReferenceUp * t;
 
             if (Vector3.Magnitude(closestPoint - motionSource.TargetPosition) <= radius)
             {
                 if (diffPosition.magnitude > 0.0001f)
                 {
-                    XTarget[0] = 1 - Mathf.Clamp01((closestPoint - motionSource.ReferencePosition).magnitude / length);
+                    XTarget[0] = 1 - (closestPoint - motionSource.ReferencePosition).magnitude / length;
 
                     var diffOnPlane = Vector3.ProjectOnPlane(diffPosition, motionSource.ReferencePlaneNormal);
                     var rightOffset = Vector3.Project(diffOnPlane, motionSource.ReferenceRight);
@@ -389,7 +424,7 @@ namespace ToySerialController
 
         private bool UpdateAutoConfig(IMotionSource motionSource)
         {
-            if (AutoLengthToggle.val)
+            if (AutoConfigToggle.val)
             {
                 var length = motionSource.GetRealReferenceLength();
                 _length = motionSource.GetRealReferenceLength();
@@ -401,13 +436,14 @@ namespace ToySerialController
                 var diffEnding = motionSource.TargetPosition - referenceEnding;
                 var aboveTarget = (Vector3.Dot(diffPosition, motionSource.TargetUp) < 0 && Vector3.Dot(diffEnding, motionSource.TargetUp) < 0)
                                     || Vector3.Dot(diffPosition, motionSource.ReferenceUp) < 0;
-                var t = Mathf.Clamp(Vector3.Dot(motionSource.TargetPosition - position, motionSource.ReferenceUp), 0f, length);
+                _aboveTarget = aboveTarget;
+                var t = Vector3.Dot(motionSource.TargetPosition - position, motionSource.ReferenceUp);
                 var closestPoint = position + motionSource.ReferenceUp * t;
                 if (Vector3.Magnitude(closestPoint - motionSource.TargetPosition) <= radius)
                 {
                     if (diffPosition.magnitude > 0.0001f)
                     {
-                        XTargetRaw[0] = 1 - Mathf.Clamp01((closestPoint - position).magnitude / length);
+                        XTargetRaw[0] = 1 - ((closestPoint - position).magnitude / length);
                         if (aboveTarget)
                             XTargetRaw[0] = XTargetRaw[0] > 0 ? 1 : 0;
                     }
@@ -415,24 +451,30 @@ namespace ToySerialController
                     {
                         XTargetRaw[0] = 1;
                     }
+
                     // update min and max
-                    //_minL0 = _minL0 < XTarget[0] ? _minL0 : XTarget[0];
-                    //_maxL0 = _maxL0 > XTarget[0] ? _maxL0 : XTarget[0];
-                    //SuperController.LogMessage($"history: {_l0Values.Count}");
-                    _l0Values[DateTime.Now] = XTargetRaw[0];
-                    // remove any old timestamps
-                    for (int i = 0; i < _l0Values.Count; i++)
+                    if (AutoStyleChooser.val == "Min + Max")
                     {
-                        var item = _l0Values.ElementAt(i);
-                        if (DateTime.Now.Subtract(item.Key).TotalSeconds > AutoLengthReactSpeed.val)
-                        {
-                            _l0Values.Remove(item.Key);
-                            i--;
-                        }
+                        _minL0 = _minL0 < XTargetRaw[0] ? _minL0 : XTargetRaw[0];
+                        _maxL0 = _maxL0 > XTargetRaw[0] ? _maxL0 : XTargetRaw[0];
                     }
-                    // determine min and max from history
-                    _minL0 = _l0Values.Min(x => x.Value);
-                    _maxL0 = _l0Values.Max(x => x.Value);
+                    if (AutoStyleChooser.val == "Average over time")
+                    {
+                        _l0Values[DateTime.Now] = XTargetRaw[0];
+                        // remove any old timestamps
+                        for (int i = 0; i < _l0Values.Count; i++)
+                        {
+                            var item = _l0Values.ElementAt(i);
+                            if (DateTime.Now.Subtract(item.Key).TotalSeconds > AutoConfigBufferLength.val)
+                            {
+                                _l0Values.Remove(item.Key);
+                                i--;
+                            }
+                        }
+                        // determine min and max from history
+                        _minL0 = _l0Values.Min(x => x.Value);
+                        _maxL0 = _l0Values.Max(x => x.Value);
+                    }
 
                     return true;
                 }
@@ -447,16 +489,17 @@ namespace ToySerialController
         private bool UpdateConfig(IMotionSource motionSource)
         {
             // update the length
-            if (AutoLengthToggle.val)
+            if (AutoConfigToggle.val)
             {
                 // determine proposed length
-                var length = GetRecommendedLength();
+                var length = InflateLength();
                 // determine length error
                 var lengthDelta = length - ReferenceLengthScaleSlider.val;
                 //SuperController.LogMessage($"length: {length} lengthD: {lengthDelta} XTarget: {XTarget[0]} Reference: {ReferenceLengthScaleSlider.val}");
 
                 // if the current length is deemed too short, lengthen, but only if current target is below 5% (penis is JUST inside vagina, about to pop out? so we can lengthen to avoid or re-insert?)
-                if (lengthDelta > 0 && XTarget[0] < 0.05)
+                //if (lengthDelta > 0 && XTarget[0] < 0.05)
+                if (lengthDelta > 0.005)
                 {
                     // NOTE:: We do not allow lengthening when ?? not sure but it works, keep an eye on it
                     ReferenceLengthScaleSlider.val += 0.01f;
@@ -464,7 +507,8 @@ namespace ToySerialController
                 }
 
                 // if the current length is deemed too long, shorten, but only if current target is above 5% (penis is inside vagina, if < 5% then penis is outside vagina)
-                if (lengthDelta < 0 && XTarget[0] > 0.05 && ReferenceLengthScaleSlider.val > 0.1)
+                //if (lengthDelta > 0 && XTarget[0] > 0.05 && ReferenceLengthScaleSlider.val > 0.1)
+                if (lengthDelta < -0.005 && ReferenceLengthScaleSlider.val > 0.1)
                 {
                     // NOTE:: We do not allow shortening when ?? not sure but it works, keep an eye on it
                     ReferenceLengthScaleSlider.val -= 0.01f;
@@ -472,19 +516,21 @@ namespace ToySerialController
                 }
 
                 // determine proposed base offset
-                var offset = GetRecommendedOffset();
+                var offset = InflateOffset();
                 // round to be less precise
                 offset = Mathf.Round(offset * 1000f) / 1000f;
                 //SuperController.LogMessage($"offset: {offset} BaseOffset: {motionSource.PenisBaseOffset}");
 
                 // if current base is deemed too shallow, extend, but only if ??
-                if (offset < motionSource.GetBaseOffset() && XTarget[0] < 0.95)
+                //if (offset < motionSource.GetBaseOffset() && XTarget[0] < 0.95)
+                if (offset < (motionSource.GetBaseOffset() - 0.0005))
                 {
                     //motionSource.PenisBaseOffset -= 0.001f;
                     motionSource.SetBaseOffset(motionSource.GetBaseOffset() - 0.001f);
                 }
                 // if current base is deemed too deep, retract, but only if ??
-                if (offset > motionSource.GetBaseOffset() && XTarget[0] > 0.95)
+                //if (offset > motionSource.GetBaseOffset() && XTarget[0] > 0.95)
+                if (offset > (motionSource.GetBaseOffset() + 0.0005))
                 {
                     //motionSource.PenisBaseOffset += 0.001f;
                     motionSource.SetBaseOffset(motionSource.GetBaseOffset() + 0.001f);
