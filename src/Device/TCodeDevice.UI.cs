@@ -55,6 +55,7 @@ namespace ToySerialController
         private JSONStorableBool InvertR0Toggle;
         private JSONStorableFloat OutputMaxR0Slider;
         private JSONStorableBool EnableOverrideR0Toggle;
+        private JSONStorableBool EnableThrustSyncR0Toggle;
         private JSONStorableFloat OffsetR0Slider;
         private JSONStorableFloat OverrideR0Slider;
         private JSONStorableFloat RangeMaxR0Slider;
@@ -237,6 +238,7 @@ namespace ToySerialController
             OffsetR0Slider = group.CreateSlider("Device:R0:Offset", "Offset (%)", 0f, -0.25f, 0.25f, true, true, true, "P0");
             InvertR0Toggle = group.CreateToggle("Device:R0:Invert", "Invert", false, true);
             EnableOverrideR0Toggle = group.CreateToggle("Device:R0:EnableOverride", "Enable Override", false, true);
+            EnableThrustSyncR0Toggle = group.CreateToggle("Device:R0:EnableThrustSync", "Enable Thrust Sync", false, true);
             OverrideR0Slider = group.CreateSlider("Device:R0:Override", "Override Value (%)", 0.5f, 0f, 1f, true, true, true, "P0");
 
             group.SetVisible(false);

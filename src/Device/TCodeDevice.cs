@@ -282,6 +282,7 @@ namespace ToySerialController
 
             if (InvertR0Toggle.val) output = 1f - output;
             if (EnableOverrideR0Toggle.val) output = OverrideR0Slider.val;
+            if (EnableThrustSyncR0Toggle.val) output = XCmd[0];
             if (_lastNoCollisionSmoothingEnabled)
                 output = Mathf.Lerp(RCmd[0], output, _lastCollisionSmoothingT);
 
