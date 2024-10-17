@@ -87,7 +87,7 @@ namespace ToySerialController
         }
 
         // get the recommended length based on the readings we have
-        private float GetRecommendedLength()
+        private float GetRecommendedLength_old()
         {
             // if we are above target, recommended length is always 100% (so we get good feedback when inserting penis)
             if (_aboveTarget)
@@ -106,6 +106,27 @@ namespace ToySerialController
 
             // NOTE:: the recommended length is a PERCENTAGE. We set this directly onto the ReferenceLength slider, which is the percentage of the actual length to use.
             return recommend;
+        }
+
+        // get the recommended length based on the readings we have
+        private float GetRecommendedLength()
+        {
+            // if we are above target, recommended length is always 100% (so we get good feedback when inserting penis)
+            if (_aboveTarget)
+            {
+                return 1;
+            }
+
+            // get the distance the topmost used point is from the tip of the penis
+            float topPoint = _minL0 * _length;
+            // the new length that we will actually use (base offset will be set by _maxL0 which reduces the length by that amount)
+            float newLength = _maxL0 * _length;
+            // find the precentage the top point is for this new length
+            float newTopPerc = topPoint / newLength;
+            // the percentage of the new length we will use is reduced by this amount from 100%
+            float newLengthPerc = 1 - newTopPerc;
+            // don't allow zero length
+            return newLength <= 0.01f ? 0.01f : newLengthPerc;
         }
 
         // get the recommended offset based on the readings we have
@@ -477,15 +498,19 @@ namespace ToySerialController
                     }
                     if (AutoStyleChooser.val == "Average over time")
                     {
-                        _l0Values[DateTime.Now] = XTargetRaw[0];
-                        // remove any old timestamps
+                        _l0Values.Add(new DateFloat(DateTime.Now, XTargetRaw[0]));
+                        // remove any old timestamps by iterating the list from the start
                         for (int i = 0; i < _l0Values.Count; i++)
                         {
-                            var item = _l0Values.ElementAt(i);
-                            if (DateTime.Now.Subtract(item.Key).TotalSeconds > AutoConfigBufferLength.val)
+                            if (DateTime.Now.Subtract(_l0Values[i].Date).TotalSeconds > AutoConfigBufferLength.val)
                             {
-                                _l0Values.Remove(item.Key);
+                                _l0Values.RemoveAt(i);
                                 i--;
+                            }
+                            else
+                            {
+                                // stop at the first entry in the list that we don't need to remove, every item after this one should be younger.
+                                break;
                             }
                         }
                         // determine min and max from history
