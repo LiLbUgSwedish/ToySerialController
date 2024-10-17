@@ -168,9 +168,9 @@ namespace ToySerialController
             // choose auto style (min max total, average over time, other?)
             var autoStyles = new List<string>
             {
-                "Min + Max", "Average over time"
+                "Min + Max", "Average over time", "Recent Peak & Trough"
             };
-            AutoStyleChooser = group.CreatePopup("Plugin:AutoStyleChooser", "Select auto config mode", autoStyles, "Average over time", AutoStyleChooserCallback, true);
+            AutoStyleChooser = group.CreatePopup("Plugin:AutoStyleChooser", "Select auto config mode", autoStyles, "Recent Peak & Trough", AutoStyleChooserCallback, true);
             AutoConfigToggle = group.CreateToggle("Device:Main:Auto Config", "Auto Config", false, true);
             AutoConfigBufferLength = group.CreateSlider("Device:Main:AutoConfigBufferLength", "Buffer Length (s)", 3.0f, 1, 10, true, true, true, "F0");
             AutoConfigBuffer = group.CreateSlider("Device:Main:AutoConfigBuffer", "Recommended Length Inflation (%)", 0.1f, -1, 1, true, true, true, "P0");

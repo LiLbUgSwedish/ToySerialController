@@ -31,14 +31,28 @@ namespace ToySerialController
         // we can try to use this, along with reference length and base offset maybe, to try to auto-configure.
         private float _minL0 = 1.0f;
         private float _maxL0 = 0.0f;
+        // keep track of the last peak and last trough
+        private DateFloat _lastPeak = new DateFloat(DateTime.Now, 1);
+        private DateFloat _lastTrough = new DateFloat(DateTime.Now, 0);
         // remember if we are not in contact with penis, then we can return placeholder values.
         private bool _aboveTarget = false;
 
         // keep a list of L0 values we can use to check min and max values for; truncate after a certain amount of time.
-        private Dictionary<DateTime, float> _l0Values = new Dictionary<DateTime, float>();
+        private List<DateFloat> _l0Values = new List<DateFloat>();
 
         // remember the male penis length, used to calculate base offset?
         private float _length = 0;
+
+        public class DateFloat {
+            public DateTime Date;
+            public float Value;
+
+            public DateFloat(DateTime date, float val)
+            {
+                Date = date;
+                Value = val;
+            }
+        }
 
         public string GetDeviceReport()
         {
@@ -128,6 +142,8 @@ namespace ToySerialController
         {
             _maxL0 = 0.0f;
             _minL0 = 1.0f;
+            _lastPeak = new DateFloat(DateTime.Now, 1);
+            _lastTrough = new DateFloat(DateTime.Now, 0);
             _l0Values.Clear();
         }
 
@@ -476,6 +492,93 @@ namespace ToySerialController
                         _minL0 = _l0Values.Min(x => x.Value);
                         _maxL0 = _l0Values.Max(x => x.Value);
                     }
+                    // look for peaks or trouphs
+                    if (AutoStyleChooser.val == "Recent Peak & Trough")
+                    {
+                        _l0Values.Add(new DateFloat(DateTime.Now, XTargetRaw[0]));
+                        if (_l0Values.Count >= 7)
+                        {
+                            if (_l0Values.Count > 7)
+                            {
+                                // truncate to 7, thats all we need
+                                _l0Values.RemoveRange(0, _l0Values.Count - 7);
+                            }
+                            // get the last, second last, and third last recorded thrust values
+                            DateFloat last1 = _l0Values[_l0Values.Count - 1];
+                            DateFloat last2 = _l0Values[_l0Values.Count - 2];
+                            DateFloat last3 = _l0Values[_l0Values.Count - 3];
+                            DateFloat last4 = _l0Values[_l0Values.Count - 4];
+                            DateFloat last5 = _l0Values[_l0Values.Count - 5];
+                            DateFloat last6 = _l0Values[_l0Values.Count - 6];
+                            DateFloat last7 = _l0Values[_l0Values.Count - 7];
+                            // if the current value is greater than the last trough, just use that value immediately
+                            if (last1.Value > _lastTrough.Value)
+                            {
+                                _lastTrough = last1;
+                                //SuperController.LogMessage($"Force TROUGH");
+                            }
+                            // else do some checks if the middle value is greater than both surrounding values, indicating it is some kind of peak
+                            else if (last1.Value < last4.Value && last2.Value < last4.Value && last3.Value < last4.Value && last5.Value < last4.Value && last6.Value < last4.Value && last7.Value < last4.Value)
+                            {
+                                // if this trough is very close to the previous peak in TIME or SPACE, ignore it (we can wobble a bit at either peak or trough and need to ignore it)
+                                if (last4.Date.Subtract(_lastPeak.Date).TotalMilliseconds > 100 && Math.Abs(_lastPeak.Value - last4.Value) > 0.05f)
+                                {
+                                    // we are not close to the last peak, lets check if we're close to the last trough in TIME
+                                    if (last4.Date.Subtract(_lastTrough.Date).TotalMilliseconds < 100)
+                                    {
+                                        // we are close to the previous trough, so only keep the larger of the two
+                                        if (_lastTrough.Value < last4.Value)
+                                        {
+                                            _lastTrough = last4;
+                                            //SuperController.LogMessage($"TROUGH UPDATE");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // this is a new trough so just keep it
+                                        _lastTrough = last4;
+                                        //SuperController.LogMessage($"TROUGH");
+
+                                    }
+                                }
+                            }
+                            // if the current value is less than the last peak, just use that value immediately
+                            if (last1.Value < _lastPeak.Value)
+                            {
+                                _lastPeak = last1;
+                                //SuperController.LogMessage($"Force PEAK");
+                            }
+                            // else do some checks if the middle value is greater than both surrounding values, indicating it is some kind of peak
+                            else if (last1.Value > last4.Value && last2.Value > last4.Value && last3.Value > last4.Value && last5.Value > last4.Value && last6.Value > last4.Value && last7.Value > last4.Value)
+                            {
+                                // if this peak is very close to the previous trough in TIME or SPACE, ignore it (we can wobble a bit at either peak or trough and need to ignore it)
+                                if (last4.Date.Subtract(_lastTrough.Date).TotalMilliseconds > 100 && Math.Abs(_lastTrough.Value - last4.Value) > 0.05f)
+                                {
+                                    // we are not close to the last peak, lets check if we're close to the last peak in TIME
+                                    if (last2.Date.Subtract(_lastPeak.Date).TotalMilliseconds < 100)
+                                    {
+                                        // we are close to the previous peak, so only keep the smaller of the two
+                                        if (_lastPeak.Value > last4.Value)
+                                        {
+                                            _lastPeak = last4;
+                                            //SuperController.LogMessage($"PEAK UPDATE");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // this is a new peak so just keep it
+                                        _lastPeak = last4;
+                                        //SuperController.LogMessage($"PEAK");
+                                    }
+                                }
+                            }
+
+                            // update max values
+                            _maxL0 = _lastTrough.Value;
+                            _minL0 = _lastPeak.Value;
+                        }
+                    }
+
 
                     return true;
                 }
